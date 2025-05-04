@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Traffic Light Animation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta/dist/vanta.clouds2.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        overflow: hidden;
+      }
+
+      #vanta-background {
+        position: fixed;
+        width: 100vw;
+        height: 100vh;
+        z-index: -1;
+      }
+
+      #three-container {
+        position: absolute;
+        width: 100vw;
+        height: 100vh;
+        z-index: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="vanta-background"></div>
+    <div id="three-container"></div>
+
+    <script>
+      VANTA.CLOUDS2({
+        el: "#vanta-background",
+        mouseControls: true,
+        touchControls: true,
+        gyroControls: false,
+        minHeight: 200.0,
+        minWidth: 200.0,
+        scale: 1.0,
+        skyColor: 0x134a64,
+        cloudColor: 0x2051b1,
+        lightColor: 0xdca0a0,
+        speed: 2.0,
+        texturePath: "./assets/noise.png",
+      });
+
+      const container = document.getElementById("three-container");
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      const renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+      });
+
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000, 0);
+      container.appendChild(renderer.domElement);
+
+      const ambientLight = new THREE.AmbientLight(0x404040);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(5, 5, 5);
+      scene.add(directionalLight);
+
+      const trafficLightGroup = new THREE.Group();
+
+      function createRoundedBoxGeometry(
+        width,
+        height,
+        depth,
+        radius,
+        smoothness
+      ) {
+        const shape = new THREE.Shape();
+        const eps = 0.00001;
+        const radius0 = radius - eps;
+        shape.absarc(eps, eps, eps, -Math.PI / 2, -Math.PI, true);
+        shape.absarc(eps, height - radius * 2, eps, Math.PI, Math.PI / 2, true);
+        shape.absarc(
+          width - radius * 2,
+          height - radius * 2,
+          eps,
+          Math.PI / 2,
+          0,
+          true
+        );
+        shape.absarc(width - radius * 2, eps, eps, 0, -Math.PI / 2, true);
+
+        const geometry = new THREE.ExtrudeGeometry(shape, {
+          depth: depth - radius * 2,
+          bevelEnabled: true,
+          bevelSegments: smoothness * 2,
+          steps: 1,
+          bevelSize: radius,
+          bevelThickness: radius,
+          curveSegments: smoothness,
+        });
+
+        geometry.center();
+        return geometry;
+      }
+
+      const bodyGeometry = createRoundedBoxGeometry(3, 8.5, 2, 0.3, 8);
+      const bodyMaterial = new THREE.MeshPhongMaterial({
+        color: 0x2c2c2c,
+        specular: 0x444444,
+        shininess: 30,
+      });
+      const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+      trafficLightGroup.add(body);
+
+      const lightGeometry = new THREE.SphereGeometry(0.8, 32, 32);
+
+      const redMaterial = new THREE.MeshPhongMaterial({
+        color: 0x4a0404,
+        emissive: 0x000000,
+        shininess: 100,
+      });
+      const redLight = new THREE.Mesh(lightGeometry, redMaterial);
+      redLight.position.y = 2.5;
+      redLight.position.z = 0.8;
+      trafficLightGroup.add(redLight);
+
+      const yellowMaterial = new THREE.MeshPhongMaterial({
+        color: 0x4a4a04,
+        emissive: 0x000000,
+        shininess: 100,
+      });
+      const yellowLight = new THREE.Mesh(lightGeometry, yellowMaterial);
+      yellowLight.position.y = 0;
+      yellowLight.position.z = 0.8;
+      trafficLightGroup.add(yellowLight);
+
+      const greenMaterial = new THREE.MeshPhongMaterial({
+        color: 0x044a04,
+        emissive: 0x000000,
+        shininess: 100,
+      });
+      const greenLight = new THREE.Mesh(lightGeometry, greenMaterial);
+      greenLight.position.y = -2.5;
+      greenLight.position.z = 0.8; 
+      trafficLightGroup.add(greenLight);
+
+      scene.add(trafficLightGroup);
+
+      camera.position.z = 12;
+      camera.position.y = 1;
+      camera.position.x = 3;
+
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.screenSpacePanning = false;
+      controls.minDistance = 5;
+      controls.maxDistance = 20;
+      controls.maxPolarAngle = Math.PI;
+
+      const TIMING = {
+        red: Math.floor(Math.random() * 5) + 2,
+        yellow: Math.floor(Math.random() * 5) + 2,
+        green: Math.floor(Math.random() * 5) + 2,
+        yellowToRed: Math.floor(Math.random() * 5) + 2,
+      };
+
+      function activateLight(light) {
+        redLight.material.emissive.setHex(0x000000);
+        redLight.material.color.setHex(0x4a0404);
+
+        yellowLight.material.emissive.setHex(0x000000);
+        yellowLight.material.color.setHex(0x4a4a04);
+
+        greenLight.material.emissive.setHex(0x000000);
+        greenLight.material.color.setHex(0x044a04);
+
+        if (light === "red") {
+          redLight.material.emissive.setHex(0xff0000);
+          redLight.material.color.setHex(0xff0000);
+        } else if (light === "yellow") {
+          yellowLight.material.emissive.setHex(0xffff00);
+          yellowLight.material.color.setHex(0xffff00);
+        } else if (light === "green") {
+          greenLight.material.emissive.setHex(0x00ff00);
+          greenLight.material.color.setHex(0x00ff00);
+        }
+      }
+
+      function createTrafficLightSequence() {
+        const tl = gsap.timeline({ repeat: -1 });
+
+        tl.call(() => activateLight("red")).to({}, { duration: TIMING.red });
+
+        tl.call(() => activateLight("yellow")).to(
+          {},
+          { duration: TIMING.yellow }
+        );
+
+        tl.call(() => activateLight("green")).to(
+          {},
+          { duration: TIMING.green }
+        );
+
+        tl.call(() => activateLight("yellow")).to(
+          {},
+          { duration: TIMING.yellowToRed }
+        );
+
+        return tl;
+      }
+
+      createTrafficLightSequence();
+
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      animate();
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    </script>
+  </body>
+</html>
